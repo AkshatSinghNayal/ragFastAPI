@@ -195,7 +195,7 @@ export default function Chat() {
       } else if (code === 'LLM_UNAVAILABLE') {
         setError('The language model is unavailable. Please try again.')
       } else {
-        setError(typeof detail === 'string' ? detail : 'Failed to send message.')
+        setError(typeof detail === 'string' ? detail : (err.message || 'Failed to send message.'))
       }
       // Remove optimistic message on failure
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
