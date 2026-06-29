@@ -261,4 +261,4 @@ npm run preview  # preview production build
 
 ## License
 
-MIT — see `LICENSE` if added.
+MIT — see `LICENSE` 
