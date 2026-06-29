@@ -116,6 +116,17 @@ export default function Login() {
             <span>{submitting ? 'Signing in…' : 'Sign in'}</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('demo@contextiq.com')
+              setPassword('password123')
+            }}
+            className="flex w-full items-center justify-center h-10 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors"
+          >
+            Use Demo Account
+          </button>
+
           <p className="text-center text-xs text-zinc-500 dark:text-zinc-400 mt-4">
             Don't have an account?{' '}
             <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-500 dark:text-brand-400 dark:hover:text-brand-300">
