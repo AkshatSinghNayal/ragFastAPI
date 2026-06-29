@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # --- Gemini ---
     GEMINI_API_KEY: str = Field(default="")
     GEMINI_MODEL: str = Field(default="gemini-1.5-flash")
-    GEMINI_EMBEDDING_MODEL: str = Field(default="text-embedding-004")
+    GEMINI_EMBEDDING_MODEL: str = Field(default="gemini-embedding-001")
     EMBEDDING_DIMENSIONS: int = Field(default=768)
 
     # --- JWT / Auth ---
