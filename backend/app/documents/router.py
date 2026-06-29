@@ -30,6 +30,16 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 MAX_PDF_BYTES = 25 * 1024 * 1024  # 25 MB
 
 
+@router.get("/debug/ingestion-error", tags=["system"])
+async def get_ingestion_error():
+    import os
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "last_ingestion_error.txt")
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return {"error": f.read()}
+    return {"error": "No recorded ingestion error"}
+
+
 async def _ingest_in_background(document_id: uuid.UUID, pdf_bytes: bytes) -> None:
     """Background task: open a fresh DB session and run ingestion.
 

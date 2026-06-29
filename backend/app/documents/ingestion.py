@@ -304,5 +304,13 @@ async def run_ingestion(
         )
     except Exception:
         logger.exception("Ingestion failed for document %s", document.id)
+        import os
+        import traceback
+        try:
+            path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "last_ingestion_error.txt")
+            with open(path, "w") as f:
+                f.write(traceback.format_exc())
+        except Exception as write_err:
+            logger.error("Failed to write debug error file: %s", write_err)
         document.status = "failed"
         await db.commit()
