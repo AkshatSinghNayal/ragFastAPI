@@ -1,4 +1,4 @@
-# DocChat — RAG Document Chat Application
+# ContestRagIQ — RAG Document Chat Application
 
 Upload PDFs and chat with them using Google Gemini, grounded in semantic search
 over Qdrant vector embeddings. JWT-authenticated, multi-user, source-cited,
