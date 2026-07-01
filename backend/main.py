@@ -11,7 +11,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth.router import router as auth_router
 from app.chat.router import router as chat_router
@@ -54,15 +53,6 @@ app = FastAPI(
     version="1.0.0",
     description="Upload PDFs and chat with them using Gemini + Qdrant.",
     lifespan=lifespan,
-)
-
-# --- Session (for OAuth state persistence) ---
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.JWT_SECRET,
-    max_age=600,  # 10 min — long enough for OAuth flow
-    same_site="lax",  # must be lax for OAuth redirect to send session cookie
-    https_only=settings.COOKIE_SECURE,
 )
 
 # --- CORS ---

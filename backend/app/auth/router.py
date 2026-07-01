@@ -27,6 +27,8 @@ from app.schemas.auth import (
 from app.services.google_auth import get_google_login_url, process_google_callback
 from app.utils.errors import InvalidRefreshTokenError
 
+OAUTH_STATE_COOKIE = "oauth_state"
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -126,10 +128,21 @@ async def me(current_user: User = Depends(get_current_user)) -> UserOut:
 async def google_login(request: Request):
     """Redirect the user to Google's OAuth consent page.
 
-    Authlib automatically generates and stores a CSRF state
-    value in the session cookie before redirecting.
+    Generates a CSRF state value and stores it in a signed cookie
+    for validation when Google redirects back.
     """
-    redirect = await get_google_login_url(request)
+    state, auth_url = await get_google_login_url(request)
+
+    redirect = RedirectResponse(url=auth_url, status_code=302)
+    redirect.set_cookie(
+        key=OAUTH_STATE_COOKIE,
+        value=state,
+        max_age=600,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        path="/",
+    )
     return redirect
 
 
@@ -146,16 +159,38 @@ async def google_callback(
 
     On failure: redirects to FRONTEND_URL/auth/callback?error=<code>.
     """
-    try:
-        user, access_token, refresh_token = await process_google_callback(
-            request, db
-        )
-    except Exception as exc:
-        logger.warning("Google OAuth callback failed: %s", exc)
+    expected_state = request.cookies.get(OAUTH_STATE_COOKIE)
+    if not expected_state:
         error_param = "google_auth_failed"
         redirect = RedirectResponse(
             url=f"{settings.FRONTEND_URL}/auth/callback?error={error_param}",
             status_code=302,
+        )
+        redirect.delete_cookie(
+            key=OAUTH_STATE_COOKIE,
+            path="/",
+            secure=settings.COOKIE_SECURE,
+            samesite="lax",
+            httponly=True,
+        )
+        return redirect
+
+    try:
+        user, access_token, refresh_token = await process_google_callback(
+            request, db, expected_state
+        )
+    except Exception as exc:
+        logger.warning("Google OAuth callback failed: %s", exc)
+        redirect = RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/auth/callback?error=google_auth_failed",
+            status_code=302,
+        )
+        redirect.delete_cookie(
+            key=OAUTH_STATE_COOKIE,
+            path="/",
+            secure=settings.COOKIE_SECURE,
+            samesite="lax",
+            httponly=True,
         )
         return redirect
 
@@ -164,6 +199,13 @@ async def google_callback(
         status_code=302,
     )
 
+    redirect.delete_cookie(
+        key=OAUTH_STATE_COOKIE,
+        path="/",
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        httponly=True,
+    )
     redirect.set_cookie(
         key=settings.REFRESH_COOKIE_NAME,
         value=refresh_token,
