@@ -36,12 +36,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     """Attach an httpOnly, Secure (in prod), SameSite=Strict refresh cookie."""
+    is_secure = settings.COOKIE_SECURE and settings.BACKEND_URL.startswith("https://")
     response.set_cookie(
         key=settings.REFRESH_COOKIE_NAME,
         value=refresh_token,
         max_age=settings.refresh_cookie_max_age,
         httponly=True,
-        secure=settings.COOKIE_SECURE,
+        secure=is_secure,
         samesite=settings.COOKIE_SAMESITE,
         path="/auth",
     )
@@ -49,11 +50,12 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
 
 def _clear_refresh_cookie(response: Response) -> None:
     """Remove the refresh cookie."""
+    is_secure = settings.COOKIE_SECURE and settings.BACKEND_URL.startswith("https://")
     response.delete_cookie(
         key=settings.REFRESH_COOKIE_NAME,
         path="/auth",
         httponly=True,
-        secure=settings.COOKIE_SECURE,
+        secure=is_secure,
         samesite=settings.COOKIE_SAMESITE,
     )
 
@@ -133,13 +135,14 @@ async def google_login(request: Request):
     """
     state, auth_url = await get_google_login_url(request)
 
+    is_secure = settings.COOKIE_SECURE and settings.BACKEND_URL.startswith("https://")
     redirect = RedirectResponse(url=auth_url, status_code=302)
     redirect.set_cookie(
         key=OAUTH_STATE_COOKIE,
         value=state,
         max_age=600,
         httponly=True,
-        secure=settings.COOKIE_SECURE,
+        secure=is_secure,
         samesite="lax",
         path="/",
     )
@@ -160,7 +163,14 @@ async def google_callback(
     On failure: redirects to FRONTEND_URL/auth/callback?error=<code>.
     """
     expected_state = request.cookies.get(OAUTH_STATE_COOKIE)
+    is_secure = settings.COOKIE_SECURE and settings.BACKEND_URL.startswith("https://")
+
     if not expected_state:
+        logger.warning(
+            "Google OAuth callback failed: state cookie %r is missing from request. Available cookies: %s",
+            OAUTH_STATE_COOKIE,
+            list(request.cookies.keys()),
+        )
         error_param = "google_auth_failed"
         redirect = RedirectResponse(
             url=f"{settings.FRONTEND_URL}/auth/callback?error={error_param}",
@@ -169,7 +179,7 @@ async def google_callback(
         redirect.delete_cookie(
             key=OAUTH_STATE_COOKIE,
             path="/",
-            secure=settings.COOKIE_SECURE,
+            secure=is_secure,
             samesite="lax",
             httponly=True,
         )
@@ -188,7 +198,7 @@ async def google_callback(
         redirect.delete_cookie(
             key=OAUTH_STATE_COOKIE,
             path="/",
-            secure=settings.COOKIE_SECURE,
+            secure=is_secure,
             samesite="lax",
             httponly=True,
         )
@@ -202,7 +212,7 @@ async def google_callback(
     redirect.delete_cookie(
         key=OAUTH_STATE_COOKIE,
         path="/",
-        secure=settings.COOKIE_SECURE,
+        secure=is_secure,
         samesite="lax",
         httponly=True,
     )
@@ -211,7 +221,7 @@ async def google_callback(
         value=refresh_token,
         max_age=settings.refresh_cookie_max_age,
         httponly=True,
-        secure=settings.COOKIE_SECURE,
+        secure=is_secure,
         samesite=settings.COOKIE_SAMESITE,
         path="/auth",
     )

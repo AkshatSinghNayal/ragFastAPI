@@ -11,8 +11,14 @@ from fastapi import Request, Response
 from joserfc import jwk as jose_jwk
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import os
 from app.config import settings
 from app.models.models import User
+
+# Allow insecure OAuth transport (HTTP) for local development if backend URL is HTTP
+if settings.BACKEND_URL.startswith("http://"):
+    os.environ["AUTHLIB_INSECURE_TRANSPORT"] = "1"
+
 
 logger = logging.getLogger(__name__)
 
@@ -97,13 +103,17 @@ async def process_google_callback(
 
     redirect_uri = f"{settings.BACKEND_URL}/auth/google/callback"
 
+    auth_resp = str(request.url)
+    if settings.BACKEND_URL.startswith("https://") and auth_resp.startswith("http://"):
+        auth_resp = auth_resp.replace("http://", "https://", 1)
+
     async with AsyncOAuth2Client(
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
     ) as client:
         token = await client.fetch_token(
             config["token_endpoint"],
-            authorization_response=str(request.url),
+            authorization_response=auth_resp,
             grant_type="authorization_code",
             redirect_uri=redirect_uri,
         )
@@ -165,11 +175,12 @@ def _verify_id_token(id_token_str: str, jwks: list) -> Dict[str, Any]:
     if not jwk_data:
         raise ValueError(f"No matching JWK found for kid={kid}")
 
-    public_key = jose_jwk.JWK.import_key(jwk_data)
+    public_key = jose_jwk.import_key(jwk_data)
+    pem_key = public_key.as_pem()
     try:
         claims = pyjwt.decode(
             id_token_str,
-            public_key,
+            pem_key,
             algorithms=["RS256"],
             audience=settings.GOOGLE_CLIENT_ID,
             issuer=["https://accounts.google.com", "accounts.google.com"],
