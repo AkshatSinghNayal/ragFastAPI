@@ -353,7 +353,5 @@ npm run preview  # preview production build
 ```
 
 ---
-
-## License
-
-MIT — see `LICENSE`
+## System Workflow Overview
+![System Overview](flow-diagram.png)
