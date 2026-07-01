@@ -61,7 +61,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=settings.JWT_SECRET,
     max_age=600,  # 10 min — long enough for OAuth flow
-    same_site=settings.COOKIE_SAMESITE,
+    same_site="lax",  # must be lax for OAuth redirect to send session cookie
     https_only=settings.COOKIE_SECURE,
 )
 
