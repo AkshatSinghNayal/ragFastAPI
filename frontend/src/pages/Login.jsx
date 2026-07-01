@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Sun, Moon, Sparkles, Mail, Lock, Loader2 } from 'lucide-react'
+import { Sun, Moon, Sparkles, Mail, Lock, Loader2, Chrome } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Login() {
@@ -115,6 +115,23 @@ export default function Login() {
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{submitting ? 'Signing in…' : 'Sign in'}</span>
           </button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-white dark:bg-zinc-900 px-2 text-zinc-400">or continue with</span>
+            </div>
+          </div>
+
+          <a
+            href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google/login`}
+            className="flex w-full items-center justify-center gap-2 h-10 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors"
+          >
+            <Chrome className="h-4 w-4" />
+            Sign in with Google
+          </a>
 
           <button
             type="button"

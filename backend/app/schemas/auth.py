@@ -34,6 +34,11 @@ class UserOut(BaseModel):
 
     id: uuid.UUID
     email: EmailStr
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+    locale: Optional[str] = None
     created_at: datetime
 
 

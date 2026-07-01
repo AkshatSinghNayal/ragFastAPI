@@ -23,7 +23,17 @@ class User(Base):
     email: Mapped[str] = mapped_column(
         String(255), unique=True, nullable=False, index=True
     )
-    hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
+    hashed_password: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    google_id: Mapped[Optional[str]] = mapped_column(
+        String(255), unique=True, nullable=True, index=True
+    )
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    picture: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    given_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    family_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    locale: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

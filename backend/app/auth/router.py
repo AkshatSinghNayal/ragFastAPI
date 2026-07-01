@@ -1,7 +1,10 @@
-"""Auth endpoints: /auth/register, /auth/login, /auth/refresh, /auth/logout."""
+"""Auth endpoints: register, login, refresh, logout, Google OAuth."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
@@ -21,7 +24,10 @@ from app.schemas.auth import (
     TokenResponse,
     UserOut,
 )
+from app.services.google_auth import get_google_login_url, process_google_callback
 from app.utils.errors import InvalidRefreshTokenError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -111,3 +117,61 @@ async def logout(
 async def me(current_user: User = Depends(get_current_user)) -> UserOut:
     """Return the currently authenticated user's profile."""
     return UserOut.model_validate(current_user)
+
+
+# --- Google OAuth ---
+
+
+@router.get("/google/login")
+async def google_login(request: Request):
+    """Redirect the user to Google's OAuth consent page.
+
+    Authlib automatically generates and stores a CSRF state
+    value in the session cookie before redirecting.
+    """
+    redirect = await get_google_login_url(request)
+    return redirect
+
+
+@router.get("/google/callback")
+async def google_callback(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle the OAuth 2.0 callback from Google.
+
+    On success: sets the httpOnly refresh cookie and redirects to
+    FRONTEND_URL/auth/callback.
+
+    On failure: redirects to FRONTEND_URL/auth/callback?error=<code>.
+    """
+    try:
+        user, access_token, refresh_token = await process_google_callback(
+            request, db
+        )
+    except Exception as exc:
+        logger.warning("Google OAuth callback failed: %s", exc)
+        error_param = "google_auth_failed"
+        redirect = RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/auth/callback?error={error_param}",
+            status_code=302,
+        )
+        return redirect
+
+    redirect = RedirectResponse(
+        url=f"{settings.FRONTEND_URL}/auth/callback",
+        status_code=302,
+    )
+
+    redirect.set_cookie(
+        key=settings.REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        max_age=settings.refresh_cookie_max_age,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        path="/auth",
+    )
+
+    return redirect

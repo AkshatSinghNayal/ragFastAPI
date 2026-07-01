@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
 
+    # --- Google OAuth ---
+    GOOGLE_CLIENT_ID: str = Field(default="")
+    GOOGLE_CLIENT_SECRET: str = Field(default="")
+    FRONTEND_URL: str = Field(default="http://localhost:5173")
+    BACKEND_URL: str = Field(default="http://localhost:8000")
+    GOOGLE_OPENID_CONFIG_URL: str = Field(
+        default="https://accounts.google.com/.well-known/openid-configuration"
+    )
+
     # --- CORS ---
     ALLOWED_ORIGINS: str = Field(default="http://localhost:5173")
 
