@@ -95,6 +95,8 @@ async def process_google_callback(
 
     config = await _fetch_openid_config()
 
+    redirect_uri = f"{settings.BACKEND_URL}/auth/google/callback"
+
     async with AsyncOAuth2Client(
         client_id=settings.GOOGLE_CLIENT_ID,
         client_secret=settings.GOOGLE_CLIENT_SECRET,
@@ -103,6 +105,7 @@ async def process_google_callback(
             config["token_endpoint"],
             authorization_response=str(request.url),
             grant_type="authorization_code",
+            redirect_uri=redirect_uri,
         )
 
     id_token_str: Optional[str] = token.get("id_token")
