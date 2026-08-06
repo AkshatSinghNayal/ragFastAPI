@@ -44,6 +44,22 @@ export default function Login() {
     }
   }
 
+  async function handleDemoLogin() {
+    setEmail('demo@contextiq.com')
+    setPassword('password123')
+    setError('')
+    setSubmitting(true)
+    try {
+      await login('demo@contextiq.com', 'password123')
+      navigate(from, { replace: true })
+    } catch (err) {
+      const detail = err.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Demo login failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4 transition-colors duration-200">
       {/* Theme Switcher in Corner */}
@@ -140,13 +156,12 @@ export default function Login() {
 
           <button
             type="button"
-            onClick={() => {
-              setEmail('demo@contextiq.com')
-              setPassword('password123')
-            }}
-            className="flex w-full items-center justify-center h-10 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors"
+            onClick={handleDemoLogin}
+            disabled={submitting}
+            className="flex w-full items-center justify-center gap-2 h-10 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors"
           >
-            Use Demo Account
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <span>Use Demo Account</span>
           </button>
 
           <p className="text-center text-xs text-zinc-500 dark:text-zinc-400 mt-4">
