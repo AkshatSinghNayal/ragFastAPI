@@ -22,16 +22,40 @@ from app.database import Base  # noqa: E402
 # Import models so they register with Base.metadata.
 from app.models import models as _models  # noqa: F401, E402
 
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Convert async URL to sync for Alembic.
-sync_url = settings.DATABASE_URL.replace("+asyncpg", "+psycopg")
-if "+psycopg" not in sync_url and sync_url.startswith("postgresql://"):
-    sync_url = sync_url.replace("postgresql://", "postgresql+psycopg://")
 
+def make_sync_url(async_url: str) -> str:
+    url = async_url.replace("+asyncpg", "+psycopg")
+    if not url.startswith("postgresql+psycopg://") and url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    parsed = urlparse(url)
+    if parsed.query:
+        query_params = parse_qs(parsed.query)
+        if "ssl" in query_params:
+            ssl_val = query_params.pop("ssl")[0]
+            query_params["sslmode"] = [ssl_val if ssl_val != "true" else "require"]
+        new_query = urlencode(query_params, doseq=True)
+        url = urlunparse(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                new_query,
+                parsed.fragment,
+            )
+        )
+    return url
+
+
+sync_url = make_sync_url(settings.DATABASE_URL)
 config.set_main_option("sqlalchemy.url", sync_url)
 
 target_metadata = Base.metadata

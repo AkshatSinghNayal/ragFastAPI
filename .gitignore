@@ -30,3 +30,6 @@ frontend/build/
 # System files
 .DS_Store
 Thumbs.db
+
+# Scratch / temp
+scratch/

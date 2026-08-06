@@ -9,7 +9,8 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import List
 
-from pydantic import Field, computed_field
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +31,41 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/ragchat"
     )
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def sanitize_database_url(cls, v: str) -> str:
+        """Sanitize DATABASE_URL for asyncpg driver."""
+        if not v:
+            return v
+        url = v.strip()
+        if url.startswith("postgres://"):
+            url = "postgresql+asyncpg://" + url[len("postgres://") :]
+        elif url.startswith("postgresql://"):
+            url = "postgresql+asyncpg://" + url[len("postgresql://") :]
+
+        parsed = urlparse(url)
+        if parsed.query:
+            query_params = parse_qs(parsed.query)
+            if "sslmode" in query_params:
+                sslmode = query_params.pop("sslmode")[0]
+                if sslmode in ("require", "verify-ca", "verify-full", "prefer"):
+                    query_params["ssl"] = ["require"]
+                elif sslmode in ("disable", "allow"):
+                    query_params["ssl"] = ["disable"]
+            query_params.pop("channel_binding", None)
+            new_query = urlencode(query_params, doseq=True)
+            url = urlunparse(
+                (
+                    parsed.scheme,
+                    parsed.netloc,
+                    parsed.path,
+                    parsed.params,
+                    new_query,
+                    parsed.fragment,
+                )
+            )
+        return url
 
     # --- Qdrant ---
     QDRANT_URL: str = Field(default="http://localhost:6333")
