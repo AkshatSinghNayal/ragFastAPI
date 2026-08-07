@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Sun, Moon, Sparkles, ArrowLeft, Send, Search, LogOut, Loader2, MessageSquare, AlertCircle } from 'lucide-react'
+import { Sun, Moon, Sparkles, ArrowLeft, Send, Search, LogOut, Loader2, MessageSquare, AlertCircle, Plus } from 'lucide-react'
 import api from '../api/axios.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import MessageBubble from '../components/MessageBubble.jsx'
@@ -61,6 +61,15 @@ export default function Chat() {
 
   const scrollRef = useRef(null)
   const pollRef = useRef(null)
+  const textareaRef = useRef(null)
+
+  // Auto-expand textarea height as prompt grows (Claude style)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 260)}px`
+    }
+  }, [input])
 
   const toggleTheme = () => {
     if (window.document.documentElement.classList.contains('dark')) {
@@ -320,13 +329,14 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Composer */}
+      {/* Claude-Style Auto-Expanding Prompt Composer */}
       <form
         onSubmit={handleSend}
-        className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4"
+        className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 sm:px-6 py-4"
       >
-        <div className="mx-auto flex max-w-3xl items-end gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-1.5 focus-within:border-brand-500 dark:focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-colors">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/90 shadow-md focus-within:border-brand-500 dark:focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500/50 transition-all p-3 flex flex-col justify-between min-h-[100px]">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -342,25 +352,45 @@ export default function Chat() {
                 ? 'Document is still being processed…'
                 : document?.status === 'failed'
                   ? 'This document could not be processed.'
-                  : 'Ask a question about this document...'
+                  : 'Ask anything about this document...'
             }
-            className="block w-full resize-none bg-transparent py-2 px-3 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none max-h-40 min-h-[36px]"
+            className="w-full resize-none bg-transparent py-1 px-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none min-h-[44px] max-h-60 overflow-y-auto scroll-thin"
           />
-          <button
-            type="submit"
-            disabled={!input.trim() || sending || document?.status !== 'ready'}
-            className="btn-primary !h-9 !w-9 !p-0 shrink-0 rounded-lg"
-            title="Send question"
-          >
-            {sending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </button>
+
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 mt-2">
+            <div className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-zinc-200/60 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors"
+                title="Upload or switch document"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+              <span className="text-[11px] font-medium bg-zinc-200/60 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-brand-500" />
+                <span>Gemini 1.5 Grounded</span>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={!input.trim() || sending || document?.status !== 'ready'}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 dark:bg-brand-500 text-white disabled:opacity-40 disabled:hover:bg-brand-600 hover:bg-brand-700 transition-all shadow-sm cursor-pointer"
+                title="Send question"
+              >
+                {sending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
         </div>
         <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
-          Press Enter to send, Shift+Enter for a new line. Answers are grounded in the document text.
+          Press Enter to send, Shift+Enter for a new line. Answers are grounded in document vectors.
         </p>
       </form>
     </div>
