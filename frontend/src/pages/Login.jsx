@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Sun, Moon, Sparkles, Mail, Lock, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { getApiBaseUrl } from '../api/axios.js'
 
 export default function Login() {
   const { login } = useAuth()
@@ -142,7 +143,7 @@ export default function Login() {
           </div>
 
           <a
-            href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google/login`}
+            href={`${getApiBaseUrl()}/auth/google/login`}
             className="flex w-full items-center justify-center gap-2 h-10 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors"
           >
             <svg className="h-4 w-4" viewBox="0 0 48 48" fill="none">

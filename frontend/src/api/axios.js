@@ -1,9 +1,23 @@
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+export function getApiBaseUrl() {
+  const envUrl = import.meta.env.VITE_API_URL
+  const isProdHost =
+    typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1'
+
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    return envUrl.replace(/\/+$/, '')
+  }
+  if (isProdHost || import.meta.env.PROD) {
+    return 'https://contextiq-backend-r0jh.onrender.com'
+  }
+  return (envUrl || 'http://localhost:8000').replace(/\/+$/, '')
+}
 
 const api = axios.create({
-  baseURL,
+  baseURL: getApiBaseUrl(),
   withCredentials: true, // send httpOnly refresh cookie
   headers: { 'Content-Type': 'application/json' },
 })
@@ -97,7 +111,7 @@ api.interceptors.response.use(
     try {
       // Call /auth/refresh — refresh token is in the httpOnly cookie.
       const { data } = await axios.post(
-        `${baseURL}/auth/refresh`,
+        `${getApiBaseUrl()}/auth/refresh`,
         {},
         { withCredentials: true },
       )
