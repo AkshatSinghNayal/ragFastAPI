@@ -105,7 +105,21 @@ class Settings(BaseSettings):
     # --- Cookie ---
     REFRESH_COOKIE_NAME: str = Field(default="refresh_token")
     COOKIE_SECURE: bool = Field(default=False)
-    COOKIE_SAMESITE: str = Field(default="strict")
+    COOKIE_SAMESITE: str = Field(default="lax")
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def is_cookie_secure(self) -> bool:
+        """Return True if explicitly requested or if backend URL uses https."""
+        return self.COOKIE_SECURE or self.BACKEND_URL.startswith("https://")
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def effective_cookie_samesite(self) -> str:
+        """Return 'none' for HTTPS production environments to support cross-domain cookies."""
+        if self.is_cookie_secure:
+            return "none"
+        return self.COOKIE_SAMESITE.lower() if self.COOKIE_SAMESITE else "lax"
 
     @computed_field  # type: ignore[misc]
     @property
@@ -118,6 +132,7 @@ class Settings(BaseSettings):
     def refresh_cookie_max_age(self) -> int:
         """Cookie max-age in seconds."""
         return self.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+
 
 
 @lru_cache

@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function AuthCallback() {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, refreshSession } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const error = searchParams.get('error')
@@ -16,6 +16,12 @@ export default function AuthCallback() {
       return () => clearTimeout(timer)
     }
   }, [error, navigate])
+
+  useEffect(() => {
+    if (!error && !isAuthenticated) {
+      refreshSession()
+    }
+  }, [error, isAuthenticated, refreshSession])
 
   useEffect(() => {
     if (isAuthenticated && !loading) {

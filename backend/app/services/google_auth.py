@@ -51,9 +51,17 @@ async def get_google_login_url(request: Request) -> Tuple[str, str]:
         (state, authorization_url)
 
     The caller is responsible for persisting the state (e.g. as a cookie).
+    The state is also signed with JWT for fallback verification if cookies are blocked.
     """
+    import time
     config = await _fetch_openid_config()
-    state = secrets.token_urlsafe(32)
+    state_payload = {
+        "nonce": secrets.token_urlsafe(16),
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 600,
+        "type": "oauth_state",
+    }
+    state = pyjwt.encode(state_payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     redirect_uri = f"{settings.BACKEND_URL}/auth/google/callback"
 
     params = {
@@ -96,8 +104,26 @@ async def process_google_callback(
     if not code:
         raise ValueError("Missing authorization code in callback")
 
-    if not state or state != expected_state:
-        raise ValueError("OAuth state mismatch - possible CSRF attack")
+    if not state:
+        raise ValueError("Missing OAuth state in callback")
+
+    state_valid = False
+    if expected_state and state == expected_state:
+        state_valid = True
+    else:
+        try:
+            payload = pyjwt.decode(
+                state,
+                settings.JWT_SECRET,
+                algorithms=[settings.JWT_ALGORITHM],
+            )
+            if payload.get("type") == "oauth_state":
+                state_valid = True
+        except Exception as e:
+            logger.warning("Signed OAuth state verification failed: %s", e)
+
+    if not state_valid:
+        raise ValueError("OAuth state mismatch or expired - possible CSRF attack")
 
     config = await _fetch_openid_config()
 

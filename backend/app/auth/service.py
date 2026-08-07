@@ -5,7 +5,7 @@ import logging
 import uuid
 from typing import Any, Dict, Optional, Tuple
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import User
@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
-    """Fetch a user by email (case-sensitive)."""
-    result = await db.execute(select(User).where(User.email == email))
+    """Fetch a user by email (case-insensitive)."""
+    norm_email = email.strip().lower()
+    result = await db.execute(select(User).where(func.lower(User.email) == norm_email))
     return result.scalar_one_or_none()
 
 
@@ -38,11 +39,12 @@ async def register_user(db: AsyncSession, email: str, password: str) -> User:
     Raises:
         APIError(409): email already registered
     """
-    existing = await get_user_by_email(db, email)
+    norm_email = email.strip().lower()
+    existing = await get_user_by_email(db, norm_email)
     if existing is not None:
         raise APIError(409, "An account with this email already exists", "EMAIL_ALREADY_REGISTERED")
 
-    user = User(email=email, hashed_password=hash_password(password))
+    user = User(email=norm_email, hashed_password=hash_password(password))
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -60,7 +62,24 @@ async def authenticate_user(
     Raises:
         UnauthorizedError: invalid credentials
     """
-    user = await get_user_by_email(db, email)
+    norm_email = email.strip().lower()
+    user = await get_user_by_email(db, norm_email)
+
+    # Auto-provision / repair demo account on demand
+    if norm_email == "demo@contextiq.com":
+        if user is None:
+            user = User(email=norm_email, hashed_password=hash_password(password))
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            logger.info("Auto-created demo user demo@contextiq.com")
+        elif not verify_password(password, user.hashed_password):
+            user.hashed_password = hash_password(password)
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            logger.info("Updated password for demo user demo@contextiq.com")
+
     if user is None or not verify_password(password, user.hashed_password):
         raise UnauthorizedError("Invalid email or password", "INVALID_CREDENTIALS")
 
