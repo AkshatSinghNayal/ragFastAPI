@@ -29,6 +29,7 @@ class User(Base):
         String(255), unique=True, nullable=True, index=True
     )
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     picture: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     given_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     family_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

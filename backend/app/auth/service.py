@@ -44,7 +44,12 @@ async def register_user(db: AsyncSession, email: str, password: str) -> User:
     if existing is not None:
         raise APIError(409, "An account with this email already exists", "EMAIL_ALREADY_REGISTERED")
 
-    user = User(email=norm_email, hashed_password=hash_password(password))
+    user = User(
+        email=norm_email,
+        hashed_password=hash_password(password),
+        name=norm_email.split('@')[0],
+        full_name=norm_email.split('@')[0],
+    )
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -68,7 +73,12 @@ async def authenticate_user(
     # Auto-provision / repair demo account on demand
     if norm_email == "demo@contextiq.com":
         if user is None:
-            user = User(email=norm_email, hashed_password=hash_password(password))
+            user = User(
+                email=norm_email,
+                hashed_password=hash_password(password),
+                name="Demo User",
+                full_name="Demo User",
+            )
             db.add(user)
             await db.commit()
             await db.refresh(user)
