@@ -84,17 +84,24 @@ async def upload_document(
     return DocumentUploadResponse(document=DocumentOut.model_validate(document))
 
 
+import logging
+logger = logging.getLogger(__name__)
+
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentListResponse:
     """List all documents belonging to the current user."""
-    docs = await list_documents_for_user(db, user)
-    return DocumentListResponse(
-        documents=[DocumentOut.model_validate(d) for d in docs],
-        total=len(docs),
-    )
+    try:
+        docs = await list_documents_for_user(db, user)
+        return DocumentListResponse(
+            documents=[DocumentOut.model_validate(d) for d in docs],
+            total=len(docs),
+        )
+    except Exception as exc:
+        logger.exception("Failed to list documents for user %s: %s", user.id, exc)
+        raise APIError(500, f"Failed to list documents: {exc}", "LIST_DOCUMENTS_FAILED")
 
 
 @router.get("/{document_id}", response_model=DocumentOut)
