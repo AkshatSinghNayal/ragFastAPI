@@ -142,11 +142,13 @@ async def get_or_create_google_user(
         logger.info("Linked Google account to existing user %s", user.id)
         return user
 
+    full_name_val = profile.get("name") or profile.get("given_name") or email.split('@')[0]
     user = User(
         email=email,
         google_id=google_id,
         hashed_password=None,
-        name=profile.get("name"),
+        name=profile.get("name") or full_name_val,
+        full_name=full_name_val,
         picture=profile.get("picture"),
         given_name=profile.get("given_name"),
         family_name=profile.get("family_name"),

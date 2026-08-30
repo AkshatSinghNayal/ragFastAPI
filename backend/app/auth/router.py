@@ -166,9 +166,11 @@ async def google_callback(
             request, db, expected_state or ""
         )
     except Exception as exc:
-        logger.warning("Google OAuth callback failed: %s", exc)
+        logger.exception("Google OAuth callback failed: %s", exc)
+        import urllib.parse
+        err_msg = urllib.parse.quote(str(exc))
         redirect = RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/auth/callback?error=google_auth_failed",
+            url=f"{settings.FRONTEND_URL}/auth/callback?error={err_msg}",
             status_code=302,
         )
         redirect.delete_cookie(

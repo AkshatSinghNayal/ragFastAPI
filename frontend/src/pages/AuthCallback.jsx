@@ -47,7 +47,7 @@ export default function AuthCallback() {
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
             {error === 'access_denied'
               ? 'You denied the sign-in request. Redirecting…'
-              : 'Something went wrong during sign-in. Redirecting…'}
+              : `Sign-in error: ${decodeURIComponent(error)}. Redirecting…`}
           </p>
         </div>
       </div>
