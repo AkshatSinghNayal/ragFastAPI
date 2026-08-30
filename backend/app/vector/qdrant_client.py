@@ -26,24 +26,19 @@ def get_client() -> AsyncQdrantClient:
     global _client
     if _client is None:
         url = settings.QDRANT_URL
-        api_key = settings.QDRANT_API_KEY
-        if url and ".cloud.qdrant.io" in url:
-            import re
-            clean_url = re.sub(r":\d+", "", url)
-            _client = AsyncQdrantClient(
-                url=clean_url,
-                port=443,
-                https=True,
-                api_key=api_key,
-                timeout=30.0,
-            )
-            logger.info("Initialized AsyncQdrantClient for Qdrant Cloud: %s", clean_url)
-        else:
-            kwargs: Dict[str, Any] = {"url": url}
-            if api_key:
-                kwargs["api_key"] = api_key
-            _client = AsyncQdrantClient(**kwargs)
-            logger.info("Initialized AsyncQdrantClient: %s", url)
+        api_key = settings.QDRANT_API_KEY or None
+        
+        # If QDRANT_URL is a cloud URL with :6333, also ensure HTTPS scheme
+        if url and ".cloud.qdrant.io" in url and not url.startswith("http"):
+            url = f"https://{url}"
+
+        _client = AsyncQdrantClient(
+            url=url,
+            api_key=api_key,
+            prefer_grpc=False,
+            timeout=30.0,
+        )
+        logger.info("Initialized AsyncQdrantClient (prefer_grpc=False) for URL: %s", url)
     return _client
 
 
@@ -105,7 +100,7 @@ async def upsert_chunks(
     """
     if not points:
         return
-    client = get_client()
+
     qdrant_points = [
         qmodels.PointStruct(
             id=p["id"],
@@ -122,9 +117,11 @@ async def upsert_chunks(
     ]
     
     import asyncio
+    global _client
     max_retries = 3
     for attempt in range(1, max_retries + 1):
         try:
+            client = get_client()
             await client.upsert(
                 collection_name=settings.QDRANT_COLLECTION,
                 points=qdrant_points,
@@ -133,6 +130,8 @@ async def upsert_chunks(
             return
         except Exception as exc:
             logger.warning("Qdrant upsert attempt %d/%d failed: %s", attempt, max_retries, exc)
+            # Reset client singleton to rebuild connection on retry
+            _client = None
             if attempt == max_retries:
                 raise
             await asyncio.sleep(1.0 * attempt)
