@@ -26,12 +26,24 @@ def get_client() -> AsyncQdrantClient:
     global _client
     if _client is None:
         url = settings.QDRANT_URL
-        if url and ".cloud.qdrant.io" in url and ":6333" in url:
-            url = url.replace(":6333", "")
-        kwargs: Dict[str, Any] = {"url": url}
-        if settings.QDRANT_API_KEY:
-            kwargs["api_key"] = settings.QDRANT_API_KEY
-        _client = AsyncQdrantClient(**kwargs)
+        api_key = settings.QDRANT_API_KEY
+        if url and ".cloud.qdrant.io" in url:
+            import re
+            clean_url = re.sub(r":\d+", "", url)
+            _client = AsyncQdrantClient(
+                url=clean_url,
+                port=443,
+                https=True,
+                api_key=api_key,
+                timeout=30.0,
+            )
+            logger.info("Initialized AsyncQdrantClient for Qdrant Cloud: %s", clean_url)
+        else:
+            kwargs: Dict[str, Any] = {"url": url}
+            if api_key:
+                kwargs["api_key"] = api_key
+            _client = AsyncQdrantClient(**kwargs)
+            logger.info("Initialized AsyncQdrantClient: %s", url)
     return _client
 
 
@@ -40,24 +52,27 @@ async def ensure_collection_exists() -> None:
 
     Called once on FastAPI startup. Safe to call multiple times.
     """
-    client = get_client()
-    collections = await client.get_collections()
-    names = {c.name for c in collections.collections}
-    if settings.QDRANT_COLLECTION in names:
-        logger.info("Qdrant collection '%s' already exists", settings.QDRANT_COLLECTION)
-        await _create_payload_indexes(client)
-        return
+    try:
+        client = get_client()
+        collections = await client.get_collections()
+        names = {c.name for c in collections.collections}
+        if settings.QDRANT_COLLECTION in names:
+            logger.info("Qdrant collection '%s' already exists", settings.QDRANT_COLLECTION)
+            await _create_payload_indexes(client)
+            return
 
-    await client.create_collection(
-        collection_name=settings.QDRANT_COLLECTION,
-        vectors_config=qmodels.VectorParams(
-            size=settings.EMBEDDING_DIMENSIONS,
-            distance=qmodels.Distance.COSINE,
-        ),
-    )
-    logger.info("Created Qdrant collection '%s' (dim=%d, cosine)",
-                settings.QDRANT_COLLECTION, settings.EMBEDDING_DIMENSIONS)
-    await _create_payload_indexes(client)
+        await client.create_collection(
+            collection_name=settings.QDRANT_COLLECTION,
+            vectors_config=qmodels.VectorParams(
+                size=settings.EMBEDDING_DIMENSIONS,
+                distance=qmodels.Distance.COSINE,
+            ),
+        )
+        logger.info("Created Qdrant collection '%s' (dim=%d, cosine)",
+                    settings.QDRANT_COLLECTION, settings.EMBEDDING_DIMENSIONS)
+        await _create_payload_indexes(client)
+    except Exception as e:
+        logger.exception("Failed to ensure Qdrant collection on startup: %s", e)
 
 
 async def _create_payload_indexes(client: AsyncQdrantClient) -> None:
@@ -77,7 +92,7 @@ async def _create_payload_indexes(client: AsyncQdrantClient) -> None:
 async def upsert_chunks(
     points: Sequence[Dict[str, Any]],
 ) -> None:
-    """Upsert a batch of chunk points.
+    """Upsert a batch of chunk points with retry logic.
 
     Each point must contain:
         - id (uuid str)
@@ -105,11 +120,22 @@ async def upsert_chunks(
         )
         for p in points
     ]
-    await client.upsert(
-        collection_name=settings.QDRANT_COLLECTION,
-        points=qdrant_points,
-        wait=True,
-    )
+    
+    import asyncio
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            await client.upsert(
+                collection_name=settings.QDRANT_COLLECTION,
+                points=qdrant_points,
+                wait=True,
+            )
+            return
+        except Exception as exc:
+            logger.warning("Qdrant upsert attempt %d/%d failed: %s", attempt, max_retries, exc)
+            if attempt == max_retries:
+                raise
+            await asyncio.sleep(1.0 * attempt)
 
 
 async def search_similar_chunks(
