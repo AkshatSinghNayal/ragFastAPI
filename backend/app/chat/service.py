@@ -79,10 +79,10 @@ def _build_prompt(context: str, history: str, question: str) -> str:
     )
 
 
-def _call_gemini_sync(prompt: str) -> str:
-    """Synchronous Gemini call — runs in a worker thread via anyio."""
+def _call_gemini_sync(prompt: str, model_name: str) -> str:
+    """Synchronous Gemini call for a specific model name — runs in a worker thread."""
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel(settings.GEMINI_MODEL)
+    model = genai.GenerativeModel(model_name)
     response = model.generate_content(prompt)
     try:
         text = response.text
@@ -93,29 +93,40 @@ def _call_gemini_sync(prompt: str) -> str:
 
 
 async def _call_gemini(prompt: str, max_retries: int = 3) -> str:
-    """Call Gemini with exponential backoff on 429s (non-blocking)."""
+    """Call Gemini with fallback across available flash models."""
     if not settings.GEMINI_API_KEY:
         raise LLMUnavailableError()
 
     import anyio
 
+    candidate_models = [
+        settings.GEMINI_MODEL,
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+    ]
+    # Deduplicate preserving order
+    seen = set()
+    models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
+
     last_exc: Optional[Exception] = None
-    for attempt in range(max_retries):
-        try:
-            text = await anyio.to_thread.run_sync(_call_gemini_sync, prompt)
-            return text
-        except Exception as exc:  # google.api_core.exceptions.ResourceExhausted, etc.
-            last_exc = exc
-            if attempt < max_retries - 1:
-                sleep_s = 2 ** attempt  # 1s, 2s, 4s
+
+    for model_name in models_to_try:
+        for attempt in range(max_retries):
+            try:
+                text = await anyio.to_thread.run_sync(_call_gemini_sync, prompt, model_name)
+                return text
+            except Exception as exc:
+                last_exc = exc
                 logger.warning(
-                    "Gemini call failed (attempt %d/%d): %s — retrying in %ds",
-                    attempt + 1, max_retries, exc, sleep_s,
+                    "Gemini call with model %s failed (attempt %d/%d): %s",
+                    model_name, attempt + 1, max_retries, exc,
                 )
-                await anyio.sleep(sleep_s)
-            else:
-                break
-    logger.exception("Gemini call failed after %d attempts: %s", max_retries, last_exc)
+                if attempt < max_retries - 1:
+                    await anyio.sleep(1.0)
+                else:
+                    break
+
+    logger.exception("All Gemini model fallbacks failed. Last error: %s", last_exc)
     raise LLMUnavailableError()
 
 

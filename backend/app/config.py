@@ -74,7 +74,7 @@ class Settings(BaseSettings):
 
     # --- Gemini ---
     GEMINI_API_KEY: str = Field(default="")
-    GEMINI_MODEL: str = Field(default="gemini-flash-latest")
+    GEMINI_MODEL: str = Field(default="gemini-3.5-flash")
     GEMINI_EMBEDDING_MODEL: str = Field(default="gemini-embedding-001")
     EMBEDDING_DIMENSIONS: int = Field(default=768)
 
