@@ -25,7 +25,10 @@ def get_client() -> AsyncQdrantClient:
     """Return a process-wide AsyncQdrantClient singleton."""
     global _client
     if _client is None:
-        kwargs: Dict[str, Any] = {"url": settings.QDRANT_URL}
+        url = settings.QDRANT_URL
+        if url and ".cloud.qdrant.io" in url and ":6333" in url:
+            url = url.replace(":6333", "")
+        kwargs: Dict[str, Any] = {"url": url}
         if settings.QDRANT_API_KEY:
             kwargs["api_key"] = settings.QDRANT_API_KEY
         _client = AsyncQdrantClient(**kwargs)

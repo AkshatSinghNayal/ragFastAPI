@@ -201,8 +201,11 @@ async def _embed_batch(batch: List[str]) -> List[List[float]]:
     import anyio
 
     def _sync() -> List[List[float]]:
+        model_name = settings.GEMINI_EMBEDDING_MODEL
+        if not model_name.startswith("models/"):
+            model_name = f"models/{model_name}"
         result = genai.embed_content(
-            model=f"models/{settings.GEMINI_EMBEDDING_MODEL}",
+            model=model_name,
             content=batch,
             task_type="retrieval_document",
             output_dimensionality=settings.EMBEDDING_DIMENSIONS,
@@ -223,8 +226,11 @@ async def embed_query(text: str) -> List[float]:
     import anyio
 
     def _sync() -> List[float]:
+        model_name = settings.GEMINI_EMBEDDING_MODEL
+        if not model_name.startswith("models/"):
+            model_name = f"models/{model_name}"
         result = genai.embed_content(
-            model=f"models/{settings.GEMINI_EMBEDDING_MODEL}",
+            model=model_name,
             content=text,
             task_type="retrieval_query",
             output_dimensionality=settings.EMBEDDING_DIMENSIONS,
