@@ -20,8 +20,10 @@ from app.vector.qdrant_client import search_similar_chunks
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
-    "You are a helpful assistant. Answer ONLY using the provided context. "
-    "If the answer is not in the context, say you don't know. "
+    "You are a helpful assistant for document Q&A. "
+    "Answer ONLY using the provided document context. "
+    "If the user's question is NOT related to the document (or if the answer is not in the document context), "
+    "explicitly reply: 'This question is not related to the uploaded document.' "
     "Never fabricate information. When the context is sufficient, cite the "
     "page numbers in square brackets, e.g. [Page 3]."
 )
@@ -237,8 +239,21 @@ async def answer_question(
     )
     answer = await _call_gemini(prompt)
 
-    # 6. Extract unique page numbers (sorted) from retrieved chunks.
-    source_pages = sorted({c["page_number"] for c in chunks if c.get("page_number")})
+    # 6. Extract unique page numbers (sorted) from retrieved chunks ONLY if answer is relevant.
+    unrelated_phrases = [
+        "not related to the",
+        "unrelated to the",
+        "not in the document",
+        "not mentioned in the",
+        "i don't know",
+        "i do not know",
+        "cannot find",
+        "unable to find",
+    ]
+    if any(phrase in answer.lower() for phrase in unrelated_phrases):
+        source_pages = []
+    else:
+        source_pages = sorted({c["page_number"] for c in chunks if c.get("page_number")})
 
     # 7. Persist both turns.
     db.add_all([
