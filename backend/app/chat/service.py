@@ -92,8 +92,8 @@ def _call_gemini_sync(prompt: str, model_name: str) -> str:
     return text.strip()
 
 
-async def _call_gemini(prompt: str, max_retries: int = 3) -> str:
-    """Call Gemini with fallback across available flash models."""
+async def _call_gemini(prompt: str, max_retries: int = 1) -> str:
+    """Call Gemini with instant fallback across available flash models."""
     if not settings.GEMINI_API_KEY:
         raise LLMUnavailableError()
 
@@ -101,8 +101,8 @@ async def _call_gemini(prompt: str, max_retries: int = 3) -> str:
 
     candidate_models = [
         settings.GEMINI_MODEL,
-        "gemini-3.5-flash",
         "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
     ]
     # Deduplicate preserving order
     seen = set()
@@ -111,20 +111,12 @@ async def _call_gemini(prompt: str, max_retries: int = 3) -> str:
     last_exc: Optional[Exception] = None
 
     for model_name in models_to_try:
-        for attempt in range(max_retries):
-            try:
-                text = await anyio.to_thread.run_sync(_call_gemini_sync, prompt, model_name)
-                return text
-            except Exception as exc:
-                last_exc = exc
-                logger.warning(
-                    "Gemini call with model %s failed (attempt %d/%d): %s",
-                    model_name, attempt + 1, max_retries, exc,
-                )
-                if attempt < max_retries - 1:
-                    await anyio.sleep(1.0)
-                else:
-                    break
+        try:
+            text = await anyio.to_thread.run_sync(_call_gemini_sync, prompt, model_name)
+            return text
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("Gemini call with model %s failed: %s — trying fallback model", model_name, exc)
 
     logger.exception("All Gemini model fallbacks failed. Last error: %s", last_exc)
     raise LLMUnavailableError()

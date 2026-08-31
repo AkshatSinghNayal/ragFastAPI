@@ -50,7 +50,7 @@ def get_client() -> AsyncQdrantClient:
             url=url,
             api_key=api_key,
             prefer_grpc=False,
-            timeout=10.0,
+            timeout=2.0,
         )
         logger.info("Initialized AsyncQdrantClient (prefer_grpc=False) for URL: %s", url)
     return _client
