@@ -159,6 +159,30 @@ async def answer_question(
         top_k=settings.RAG_TOP_K,
     )
 
+    # Persistent DB fallback lookup if vector search returns empty
+    if not chunks:
+        from app.models.models import DocumentChunk
+        db_res = await db.execute(
+            select(DocumentChunk)
+            .where(
+                DocumentChunk.document_id == document.id,
+                DocumentChunk.user_id == user.id,
+            )
+            .order_by(DocumentChunk.chunk_index.asc())
+            .limit(settings.RAG_TOP_K)
+        )
+        db_chunks_list = db_res.scalars().all()
+        if db_chunks_list:
+            chunks = [
+                {
+                    "chunk_text": c.chunk_text,
+                    "page_number": c.page_number,
+                    "chunk_index": c.chunk_index,
+                    "score": 1.0,
+                }
+                for c in db_chunks_list
+            ]
+
     # 3. If nothing relevant — return a graceful no-context answer.
     if not chunks:
         no_context_answer = (

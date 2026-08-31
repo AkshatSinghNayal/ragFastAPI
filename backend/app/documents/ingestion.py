@@ -270,6 +270,20 @@ async def run_ingestion(
             await db.commit()
             return
 
+        # Persist chunks into PostgreSQL db_document_chunks table for permanent cross-restart availability
+        from app.models.models import DocumentChunk
+        db_chunks = [
+            DocumentChunk(
+                document_id=document.id,
+                user_id=document.user_id,
+                chunk_text=c["chunk_text"],
+                page_number=c["page_number"],
+                chunk_index=c["chunk_index"],
+            )
+            for c in chunks
+        ]
+        db.add_all(db_chunks)
+
         # Embed all chunks.
         texts = [c["chunk_text"] for c in chunks]
         vectors = await embed_texts(texts)
