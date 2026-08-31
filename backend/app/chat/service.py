@@ -93,18 +93,22 @@ def _call_gemini_sync(prompt: str, model_name: str) -> str:
 
 
 async def _call_gemini(prompt: str, max_retries: int = 1) -> str:
-    """Call Gemini with instant fallback across available flash models."""
+    """Call Gemini with instant fallback across available models and strict per-model timeout."""
     if not settings.GEMINI_API_KEY:
         raise LLMUnavailableError()
 
     import anyio
+    import asyncio
 
     candidate_models = [
         settings.GEMINI_MODEL,
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-1.5-flash",
+        "gemini-flash-latest",
     ]
-    # Deduplicate preserving order
     seen = set()
     models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
 
@@ -112,11 +116,15 @@ async def _call_gemini(prompt: str, max_retries: int = 1) -> str:
 
     for model_name in models_to_try:
         try:
-            text = await anyio.to_thread.run_sync(_call_gemini_sync, prompt, model_name)
-            return text
+            text = await asyncio.wait_for(
+                anyio.to_thread.run_sync(_call_gemini_sync, prompt, model_name),
+                timeout=8.0,
+            )
+            if text:
+                return text
         except Exception as exc:
             last_exc = exc
-            logger.warning("Gemini call with model %s failed: %s — trying fallback model", model_name, exc)
+            logger.warning("Gemini call with model %s failed/timed out: %s — trying fallback", model_name, exc)
 
     logger.exception("All Gemini model fallbacks failed. Last error: %s", last_exc)
     raise LLMUnavailableError()
@@ -140,18 +148,32 @@ async def answer_question(
     if document.status != "ready":
         raise DocumentNotReadyError(document.status)
 
-    # 1. Embed the user question.
-    query_vector = await embed_query(question)
+    import asyncio
 
-    # 2. Semantic search restricted to this (document_id, user_id).
-    chunks = await search_similar_chunks(
-        query_vector=query_vector,
-        document_id=document.id,
-        user_id=user.id,
-        top_k=settings.RAG_TOP_K,
-    )
+    # 1. Safely embed query with fallback
+    query_vector = []
+    try:
+        query_vector = await asyncio.wait_for(embed_query(question), timeout=4.0)
+    except Exception as exc:
+        logger.warning("Query embedding failed/timed out (%s) — using DB chunk fallback", exc)
 
-    # Persistent DB fallback lookup if vector search returns empty
+    # 2. Try vector search if query_vector exists
+    chunks = []
+    if query_vector:
+        try:
+            chunks = await asyncio.wait_for(
+                search_similar_chunks(
+                    query_vector=query_vector,
+                    document_id=document.id,
+                    user_id=user.id,
+                    top_k=settings.RAG_TOP_K,
+                ),
+                timeout=3.0,
+            )
+        except Exception as exc:
+            logger.warning("Vector search failed/timed out (%s) — using DB chunk fallback", exc)
+
+    # 3. Persistent DB fallback lookup if chunks empty
     if not chunks:
         from app.models.models import DocumentChunk
         db_res = await db.execute(
